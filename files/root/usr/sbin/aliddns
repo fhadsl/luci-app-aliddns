@@ -156,7 +156,7 @@ add_record() {
 }
 
 update_record6() {
-    enip6=$(urlencode $ip6)
+        enip6=$(urlencode $ip6)
 	send_request "UpdateDomainRecord" "RR=$sub_dm&RecordId=$1&SignatureMethod=HMAC-SHA1&SignatureNonce=$timestamp&SignatureVersion=1.0&Timestamp=$timestamp&Type=AAAA&Value=$enip6"
 }
 
