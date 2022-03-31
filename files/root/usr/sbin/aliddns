@@ -46,9 +46,9 @@ intelnetip6() {
 resolve2ip() {
 	# resolve2ip domain<string>
 	domain=$1
-	tmp_ip=`nslookup    $domain ns1.alidns.com 2>/dev/null | sed '/^Server/d; /#53$/d' | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | tail -n1`
+	tmp_ip=`nslookup    $domain vip1.alidns.com 2>/dev/null | sed '/^Server/d; /#53$/d' | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | tail -n1`
 	if [ "Z$tmp_ip" == "Z" ]; then
-		tmp_ip=`nslookup $domain ns2.alidns.com  2>/dev/null | sed '/^Server/d; /#53$/d' | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | tail -n1`
+		tmp_ip=`nslookup $domain vip2.alidns.com  2>/dev/null | sed '/^Server/d; /#53$/d' | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | tail -n1`
 	fi
 	if [ "Z$tmp_ip" == "Z" ]; then
 		tmp_ip=`nslookup $domain 114.114.115.115 2>/dev/null | sed '/^Server/d; /#53$/d' | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | tail -n1`
@@ -62,9 +62,9 @@ resolve2ip() {
 resolve2ip6() {
 	# resolve2ip6 domain<string>
 	domain=$1
-	tmp_ip=`nslookup    $domain ns1.alidns.com 2>/dev/null | sed '/^Server/d; /#53$/d' | grep -oE '([0-9A-Fa-f]{0,4}:){2,7}([0-9A-Fa-f]{1,4}$|((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.|$)){4})' | tail -n1`
+	tmp_ip=`nslookup    $domain vip1.alidns.com 2>/dev/null | sed '/^Server/d; /#53$/d' | grep -oE '([0-9A-Fa-f]{0,4}:){2,7}([0-9A-Fa-f]{1,4}$|((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.|$)){4})' | tail -n1`
 	if [ "Z$tmp_ip" == "Z" ]; then
-		tmp_ip=`nslookup $domain ns2.alidns.com  2>/dev/null | sed '/^Server/d; /#53$/d' | grep -oE '([0-9A-Fa-f]{0,4}:){2,7}([0-9A-Fa-f]{1,4}$|((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.|$)){4})' | tail -n1`
+		tmp_ip=`nslookup $domain vip2.alidns.com  2>/dev/null | sed '/^Server/d; /#53$/d' | grep -oE '([0-9A-Fa-f]{0,4}:){2,7}([0-9A-Fa-f]{1,4}$|((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.|$)){4})' | tail -n1`
 	fi
 	if [ "Z$tmp_ip" == "Z" ]; then
 		tmp_ip=`nslookup $domain 114.114.115.115 2>/dev/null | sed '/^Server/d; /#53$/d' | grep -oE '([0-9A-Fa-f]{0,4}:){2,7}([0-9A-Fa-f]{1,4}$|((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.|$)){4})' | tail -n1`
@@ -156,11 +156,13 @@ add_record() {
 }
 
 update_record6() {
-	send_request "UpdateDomainRecord" "RR=$sub_dm&RecordId=$1&SignatureMethod=HMAC-SHA1&SignatureNonce=$timestamp&SignatureVersion=1.0&Timestamp=$timestamp&Type=AAAA&Value=$ip6"
+    enip6=$(urlencode $ip6)
+	send_request "UpdateDomainRecord" "RR=$sub_dm&RecordId=$1&SignatureMethod=HMAC-SHA1&SignatureNonce=$timestamp&SignatureVersion=1.0&Timestamp=$timestamp&Type=AAAA&Value=$enip6"
 }
 
 add_record6() {
-	send_request "AddDomainRecord&DomainName=$main_dm" "RR=$sub_dm&SignatureMethod=HMAC-SHA1&SignatureNonce=$timestamp&SignatureVersion=1.0&Timestamp=$timestamp&Type=AAAA&Value=$ip6"
+	enip6=$(urlencode $ip6)
+	send_request "AddDomainRecord&DomainName=$main_dm" "RR=$sub_dm&SignatureMethod=HMAC-SHA1&SignatureNonce=$timestamp&SignatureVersion=1.0&Timestamp=$timestamp&Type=AAAA&Value=$enip6"
 }
 
 del_record() {
@@ -243,7 +245,7 @@ iface=$(uci_get_by_name   base interface)
 if [ "Z$iface" == "Zinternet" -o "Z$iface" == "Z" ]; then
 	ip=$(intelnetip)
 else
-	ip=$(ubus call network.interface.$iface status | grep '"address"' | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | head -1)
+	ip=$(ubus call network.interface.wan status | grep '"address"' | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | head -1)
 fi
 
 DATE=$(date +'%Y-%m-%d %H:%M:%S')
@@ -256,9 +258,10 @@ check_aliddns || do_ddns_record
 uci_bool_by_name base ipv6 || exit 0
 
 if [ "Z$iface" == "Zinternet" -o "Z$iface" == "Z" ]; then
-	ip6=`urlencode $(intelnetip6)`
+	ip6=$(intelnetip6)
 else
-	ip6=`urlencode $(ubus call network.interface.$iface status | grep '"address"' | grep -oE '([0-9A-Fa-f]{0,4}:){2,7}([0-9A-Fa-f]{1,4}$|((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.|$)){4})' | head -1)`
+	#ip6=`urlencode $(ubus call network.interface.$iface status | grep '"address"' | grep -oE #'([0-9A-Fa-f]{0,4}:){2,7}([0-9A-Fa-f]{1,4}$|((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.|$)){4})' | head -1)`
+	ip6=$(ubus call network.interface.wan_6 status | grep '"address"'|awk 'NR==1{print}'|awk '{print $2}'|sed 's|"||g'|sed 's|,||g')
 fi
 
 check_aliddns6 || do_ddns_record6
